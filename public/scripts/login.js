@@ -189,8 +189,9 @@ function redirectToHome() {
     // noauto parameter (if present)
     currentUrl.searchParams.delete('noauto');
 
-    // Set the pathname to root and keep the updated query string
-    currentUrl.pathname = '/';
+    // Set the pathname to /app to ensure we go to the main application
+    // Using /app instead of / to avoid potential redirect to welcome page
+    currentUrl.pathname = '/app';
 
     // Redirect to the new URL
     window.location.href = currentUrl.toString();
