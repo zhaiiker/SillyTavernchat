@@ -29,35 +29,6 @@ function generateCharacterId() {
 }
 
 /**
- * 获取角色卡头像URL
- * @param {object} characterData 角色卡数据
- * @returns {string} 头像URL
- */
-function getCharacterAvatar(characterData) {
-    // 尝试多种可能的头像字段
-    const avatarFields = ['avatar', 'image', 'portrait', 'character_avatar', 'avatar_url'];
-
-    for (const field of avatarFields) {
-        if (characterData[field]) {
-            let avatar = characterData[field];
-
-            // 如果是相对路径，尝试构造完整URL
-            if (avatar && !avatar.startsWith('http') && !avatar.startsWith('data:')) {
-                // 移除开头的斜杠
-                avatar = avatar.replace(/^\//, '');
-                return `/${avatar}`;
-            }
-
-            // 如果是完整URL或data URL，直接返回
-            return avatar;
-        }
-    }
-
-    // 如果没有找到头像，返回默认头像
-    return 'img/ai4.png';
-}
-
-/**
  * 保存公用角色卡数据
  * @param {object} character 角色卡数据
  * @returns {boolean} 是否成功
@@ -278,13 +249,13 @@ router.post('/upload', validateFileType, async function (request, response) {
             tags: parsedTags,
             uploader: {
                 handle: request.user.profile.handle,
-                name: request.user.profile.name
+                name: request.user.profile.name,
             },
             uploaded_at: humanizedISO8601DateTime(),
             created_at: humanizedISO8601DateTime(),
             character_data: characterData,
             avatar: avatarPath,
-            downloads: 0
+            downloads: 0,
         };
 
         if (savePublicCharacter(character)) {
@@ -345,7 +316,7 @@ router.get('/search', async function (request, response) {
             characters = characters.filter(character =>
                 character.name.toLowerCase().includes(query) ||
                 character.description.toLowerCase().includes(query) ||
-                (character.tags && character.tags.some(tag => tag.toLowerCase().includes(query)))
+                (character.tags && character.tags.some(tag => tag.toLowerCase().includes(query))),
             );
         }
 
@@ -353,7 +324,7 @@ router.get('/search', async function (request, response) {
         if (uploader) {
             characters = characters.filter(character =>
                 character.uploader.handle === uploader ||
-                character.uploader.name === uploader
+                character.uploader.name === uploader,
             );
         }
 
@@ -380,7 +351,7 @@ router.post('/:characterId/download', async function (request, response) {
 
         response.json({
             success: true,
-            character_data: character.character_data
+            character_data: character.character_data,
         });
     } catch (error) {
         console.error('Error downloading public character:', error);
@@ -448,7 +419,7 @@ router.post('/:characterId/import', async function (request, response) {
             response.json({
                 success: true,
                 message: '角色卡导入成功',
-                file_name: importResult.fileName
+                file_name: importResult.fileName,
             });
         } else {
             response.status(500).json({ error: importResult.error || '导入失败' });
@@ -488,7 +459,7 @@ async function importCharacterToUserLibrary(character, user) {
         if (extension === 'png') {
             // PNG格式：从tEXt块提取角色数据
             const characterCardParser = await import('../character-card-parser.js');
-            const { write, read } = characterCardParser;
+            const { read } = characterCardParser;
             const pngBuffer = fs.readFileSync(characterFilePath);
             const metaJson = read(pngBuffer);
             try {
@@ -549,7 +520,7 @@ async function importCharacterToUserLibrary(character, user) {
         console.error('Error importing character to user library:', error);
         return {
             success: false,
-            error: error.message
+            error: error.message,
         };
     }
 }
@@ -674,10 +645,10 @@ router.post('/:characterId/comments', async function (request, response) {
             content: content.trim(),
             author: {
                 handle: request.user.profile.handle,
-                name: request.user.profile.name
+                name: request.user.profile.name,
             },
             created_at: humanizedISO8601DateTime(),
-            replies: []
+            replies: [],
         };
 
         if (parentId) {

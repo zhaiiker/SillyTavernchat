@@ -67,7 +67,7 @@ function initTransporter() {
             transportConfig.requireTLS = true;
             transportConfig.tls = {
                 ciphers: 'SSLv3',
-                rejectUnauthorized: false
+                rejectUnauthorized: false,
             };
         }
 
@@ -76,7 +76,7 @@ function initTransporter() {
             host: transportConfig.host,
             port: transportConfig.port,
             secure: transportConfig.secure,
-            user: transportConfig.auth.user
+            user: transportConfig.auth.user,
         });
 
         transporter = nodemailer.createTransport(transportConfig);

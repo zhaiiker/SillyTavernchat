@@ -456,8 +456,8 @@ router.post('/save', validateAvatarUrlMiddleware, async function (request, respo
                     messageType,
                     {
                         userName: request.user.profile.name,
-                        characterName: directoryName
-                    }
+                        characterName: directoryName,
+                    },
                 );
             }
         }

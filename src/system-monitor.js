@@ -1,14 +1,13 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { performance } from 'node:perf_hooks';
 
 /**
  * 系统负载监控器
  * 用于收集和统计服务器资源使用情况
  */
 class SystemMonitor {
-        constructor() {
+    constructor() {
         this.userLoadStats = new Map(); // 存储每个用户的负载统计
         this.systemLoadHistory = []; // 系统负载历史记录
         this.maxHistoryLength = 100; // 最多保存100条历史记录
@@ -69,7 +68,7 @@ class SystemMonitor {
             disk: diskUsage,
             network: networkUsage,
             uptime: uptime,
-            loadAverage: os.loadavg()
+            loadAverage: os.loadavg(),
         };
     }
 
@@ -97,7 +96,7 @@ class SystemMonitor {
             sys,
             idle,
             irq,
-            total
+            total,
         };
     }
 
@@ -110,7 +109,6 @@ class SystemMonitor {
         const currentCpuInfo = this.getCpuInfo();
 
         // 计算时间差和CPU时间差
-        const timeDelta = currentTime - this.lastCpuTime;
         const totalDelta = currentCpuInfo.total - this.lastCpuInfo.total;
         const idleDelta = currentCpuInfo.idle - this.lastCpuInfo.idle;
 
@@ -143,7 +141,7 @@ class SystemMonitor {
             loadAverage: os.loadavg(), // 添加系统负载平均值
             user: totalDelta > 0 ? ((currentCpuInfo.user - this.lastCpuInfo?.user || 0) / totalDelta) * 100 : 0,
             system: totalDelta > 0 ? ((currentCpuInfo.sys - this.lastCpuInfo?.sys || 0) / totalDelta) * 100 : 0,
-            idle: totalDelta > 0 ? (idleDelta / totalDelta) * 100 : 0
+            idle: totalDelta > 0 ? (idleDelta / totalDelta) * 100 : 0,
         };
     }
 
@@ -166,8 +164,8 @@ class SystemMonitor {
                 rss: processMemory.rss,
                 heapTotal: processMemory.heapTotal,
                 heapUsed: processMemory.heapUsed,
-                external: processMemory.external
-            }
+                external: processMemory.external,
+            },
         };
     }
 
@@ -177,17 +175,17 @@ class SystemMonitor {
      */
     getDiskUsage() {
         try {
-            const stats = fs.statSync(process.cwd());
+            fs.statSync(process.cwd());
             return {
                 available: true,
                 path: process.cwd(),
                 // 简化的磁盘信息，实际项目中可能需要更详细的实现
-                usage: 'N/A'
+                usage: 'N/A',
             };
         } catch (error) {
             return {
                 available: false,
-                error: error.message
+                error: error.message,
             };
         }
     }
@@ -215,7 +213,7 @@ class SystemMonitor {
             bytesPerSecIn: Math.max(0, bytesIn),
             bytesPerSecOut: Math.max(0, bytesOut),
             totalBytesIn: currentStats.bytesIn,
-            totalBytesOut: currentStats.bytesOut
+            totalBytesOut: currentStats.bytesOut,
         };
     }
 
@@ -227,7 +225,7 @@ class SystemMonitor {
         // 简化实现，实际项目中可能需要读取 /proc/net/dev (Linux) 或其他系统特定文件
         return {
             bytesIn: Math.floor(Math.random() * 1000000), // 模拟数据
-            bytesOut: Math.floor(Math.random() * 1000000)
+            bytesOut: Math.floor(Math.random() * 1000000),
         };
     }
 
@@ -243,7 +241,7 @@ class SystemMonitor {
             system: systemUptime,
             process: processUptime,
             systemFormatted: this.formatUptime(systemUptime),
-            processFormatted: this.formatUptime(processUptime)
+            processFormatted: this.formatUptime(processUptime),
         };
     }
 
@@ -270,7 +268,7 @@ class SystemMonitor {
         const activeThreshold = 10 * 60 * 1000; // 10分钟内活跃的用户
         let hasActiveUsers = false;
 
-        for (const [userHandle, stats] of this.userLoadStats) {
+        for (const [, stats] of this.userLoadStats) {
             if (currentTime - stats.lastActivity <= activeThreshold) {
                 hasActiveUsers = true;
                 break;
@@ -300,7 +298,7 @@ class SystemMonitor {
         const activeThreshold = 10 * 60 * 1000; // 10分钟内活跃的用户
         let activeCount = 0;
 
-        for (const [userHandle, stats] of this.userLoadStats) {
+        for (const [, stats] of this.userLoadStats) {
             if (currentTime - stats.lastActivity <= activeThreshold) {
                 activeCount++;
             }
@@ -309,7 +307,7 @@ class SystemMonitor {
         return activeCount;
     }
 
-        /**
+    /**
      * 记录用户聊天活动
      * @param {string} userHandle 用户句柄
      * @param {string} messageType 消息类型 ('user' 或 'character')
@@ -337,7 +335,7 @@ class SystemMonitor {
                 sessionCount: 1,           // 总会话次数
                 lastMessageTime: now,
                 characterChats: {},        // 按角色分组的聊天统计
-                dailyStats: {}             // 按日期统计
+                dailyStats: {},             // 按日期统计
             });
         }
 
@@ -375,7 +373,7 @@ class SystemMonitor {
                 messages: 0,
                 userMessages: 0,
                 characterMessages: 0,
-                firstMessage: now
+                firstMessage: now,
             };
         }
 
@@ -396,7 +394,7 @@ class SystemMonitor {
                     totalMessages: 0,
                     userMessages: 0,
                     characterMessages: 0,
-                    lastChat: now
+                    lastChat: now,
                 };
             }
 
@@ -444,7 +442,7 @@ class SystemMonitor {
                 dailyStats: {},
                 // 新增心跳相关字段
                 lastHeartbeat: null,
-                lastHeartbeatTime: null
+                lastHeartbeatTime: null,
             });
         } else {
             const userStats = this.userLoadStats.get(userHandle);
@@ -679,7 +677,7 @@ class SystemMonitor {
             lastMessageTimeFormatted: new Date(userStats.lastMessageTime).toLocaleString('zh-CN'),
             characterChats: userStats.characterChats,
             todayStats: todayStats,
-            chatActivityLevel: this.calculateChatActivityLevel(userStats)
+            chatActivityLevel: this.calculateChatActivityLevel(userStats),
         };
     }
 
@@ -711,9 +709,7 @@ class SystemMonitor {
         return 'minimal';
     }
 
-
-
-        /**
+    /**
      * 获取所有用户统计
      * @returns {Array} 用户统计数组
      */
@@ -727,7 +723,7 @@ class SystemMonitor {
             this.lastDurationUpdate = now;
         }
 
-        for (const [userHandle, stats] of this.userLoadStats) {
+        for (const [userHandle] of this.userLoadStats) {
             // 统计所有用户，不限制活跃时间
             const userStats = this.getUserLoadStats(userHandle);
             if (userStats) {
@@ -824,7 +820,7 @@ class SystemMonitor {
             // 保存系统统计信息
             const systemStats = {
                 startTime: this.startTime,
-                lastSave: Date.now()
+                lastSave: Date.now(),
             };
             fs.writeFileSync(this.systemStatsFile, JSON.stringify(systemStats, null, 2));
 

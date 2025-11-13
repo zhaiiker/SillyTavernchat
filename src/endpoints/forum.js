@@ -1,11 +1,9 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { promises as fsPromises } from 'node:fs';
 import express from 'express';
-import multer from 'multer';
 import sanitize from 'sanitize-filename';
 import { sync as writeFileAtomicSync } from 'write-file-atomic';
-import { humanizedISO8601DateTime, getConfigValue } from '../util.js';
+import { humanizedISO8601DateTime } from '../util.js';
 
 // 论坛数据存储目录
 const FORUM_DATA_DIR = path.join(globalThis.DATA_ROOT, 'forum_data');
@@ -221,13 +219,13 @@ router.post('/articles', async function (request, response) {
             tags: tags || [],
             author: {
                 handle: request.user.profile.handle,
-                name: request.user.profile.name
+                name: request.user.profile.name,
             },
             created_at: humanizedISO8601DateTime(),
             updated_at: humanizedISO8601DateTime(),
             views: 0,
             likes: 0,
-            comments_count: 0
+            comments_count: 0,
         };
 
         if (saveArticle(article)) {
@@ -353,10 +351,10 @@ router.post('/articles/:articleId/comments', async function (request, response) 
             content: content.trim(),
             author: {
                 handle: request.user.profile.handle,
-                name: request.user.profile.name
+                name: request.user.profile.name,
             },
             created_at: humanizedISO8601DateTime(),
-            likes: 0
+            likes: 0,
         };
 
         if (saveComment(comment)) {
@@ -489,7 +487,7 @@ router.post('/articles/:articleId/like', async function (request, response) {
                     success: true,
                     likes: article.likes,
                     liked: false,
-                    message: '取消点赞'
+                    message: '取消点赞',
                 });
             } else {
                 response.status(500).json({ error: 'Failed to update article' });
@@ -505,7 +503,7 @@ router.post('/articles/:articleId/like', async function (request, response) {
                     success: true,
                     likes: article.likes,
                     liked: true,
-                    message: '点赞成功'
+                    message: '点赞成功',
                 });
             } else {
                 response.status(500).json({ error: 'Failed to update article' });
@@ -525,7 +523,7 @@ router.get('/categories', async function (request, response) {
             { id: 'discussion', name: '讨论', description: '一般讨论和交流' },
             { id: 'announcement', name: '公告', description: '官方公告和通知' },
             { id: 'question', name: '问答', description: '问题和解答' },
-            { id: 'showcase', name: '展示', description: '作品展示和分享' }
+            { id: 'showcase', name: '展示', description: '作品展示和分享' },
         ];
 
         response.json(categories);
@@ -549,7 +547,7 @@ router.get('/search', async function (request, response) {
             articles = articles.filter(article =>
                 article.title.toLowerCase().includes(query) ||
                 article.content.toLowerCase().includes(query) ||
-                (article.tags && article.tags.some(tag => tag.toLowerCase().includes(query)))
+                (article.tags && article.tags.some(tag => tag.toLowerCase().includes(query))),
             );
         }
 
@@ -562,7 +560,7 @@ router.get('/search', async function (request, response) {
         if (author) {
             articles = articles.filter(article =>
                 article.author.handle === author ||
-                article.author.name === author
+                article.author.name === author,
             );
         }
 
@@ -627,7 +625,7 @@ router.post('/upload-image', async function (request, response) {
         response.json({
             success: true,
             url: imageUrl,
-            filename: fileName
+            filename: fileName,
         });
 
     } catch (error) {
@@ -667,7 +665,7 @@ router.get('/images/:filename', async function (request, response) {
             '.jpeg': 'image/jpeg',
             '.png': 'image/png',
             '.gif': 'image/gif',
-            '.webp': 'image/webp'
+            '.webp': 'image/webp',
         };
 
         const contentType = mimeTypes[ext] || 'application/octet-stream';

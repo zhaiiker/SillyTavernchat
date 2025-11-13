@@ -21,8 +21,6 @@ router.post('/logout', async (request, response) => {
             return response.sendStatus(500);
         }
 
-        request.session.handle = null;
-        request.session.csrfToken = null;
         request.session = null;
         return response.sendStatus(204);
     } catch (error) {

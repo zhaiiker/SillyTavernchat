@@ -6,7 +6,7 @@ import {
     isInvitationCodesEnabled,
     cleanupExpiredInvitationCodes,
     setPurchaseLink,
-    getPurchaseLink
+    getPurchaseLink,
 } from '../invitation-codes.js';
 import { requireAdminMiddleware } from '../users.js';
 
@@ -70,7 +70,7 @@ router.post('/batch-create', requireAdminMiddleware, async (request, response) =
         response.json({
             success: true,
             count: invitations.length,
-            codes: invitations
+            codes: invitations,
         });
     } catch (error) {
         console.error('Error batch creating invitation codes:', error);
@@ -132,7 +132,7 @@ router.post('/batch-delete', requireAdminMiddleware, async (request, response) =
             success: true,
             deletedCount,
             totalRequested: codes.length,
-            errors: errors.length > 0 ? errors : undefined
+            errors: errors.length > 0 ? errors : undefined,
         });
     } catch (error) {
         console.error('Error batch deleting invitation codes:', error);

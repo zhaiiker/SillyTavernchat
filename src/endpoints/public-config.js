@@ -14,7 +14,7 @@ router.get('/public-pages', (request, response) => {
 
         response.json({
             enablePublicCharacters,
-            enableForum
+            enableForum,
         });
     } catch (error) {
         console.error('Error getting public pages config:', error);

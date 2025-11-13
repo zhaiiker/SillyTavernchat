@@ -14,7 +14,7 @@ router.get('/', requireAdminMiddleware, async (request, response) => {
         response.json({
             system: systemLoad,
             users: userStats,
-            history: loadHistory
+            history: loadHistory,
         });
     } catch (error) {
         console.error('Error getting system load:', error);
@@ -76,7 +76,8 @@ router.post('/clear', requireAdminMiddleware, async (request, response) => {
 // 获取系统负载历史（管理员功能）
 router.get('/history', requireAdminMiddleware, async (request, response) => {
     try {
-        const limit = parseInt(request.query.limit) || 100;
+        const limitParam = request.query.limit;
+        const limit = limitParam ? parseInt(String(limitParam)) : 100;
         const history = systemMonitor.getSystemLoadHistory(limit);
         response.json(history);
     } catch (error) {

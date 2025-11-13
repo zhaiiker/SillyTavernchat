@@ -9,7 +9,6 @@ import { KEY_PREFIX, getUserAvatar, toKey, getPasswordHash, getPasswordSalt, get
 import { validateInvitationCode, useInvitationCode, getPurchaseLink, isInvitationCodesEnabled } from '../invitation-codes.js';
 import { checkForNewContent, CONTENT_TYPES } from './content-manager.js';
 import systemMonitor from '../system-monitor.js';
-import lodash from 'lodash';
 import { isEmailServiceAvailable, sendVerificationCode, sendPasswordRecoveryCode } from '../email-service.js';
 
 const DISCREET_LOGIN = getConfigValue('enableDiscreetLogin', false, 'boolean');
@@ -45,21 +44,21 @@ const sendVerificationLimiter = new RateLimiterMemory({
  * - 常见随意/弱用户名列表
  */
 function isTrivialHandle(handle) {
-	if (!handle) return true;
-	const h = String(handle).toLowerCase();
-	// 纯数字，长度>=3
-	if (/^\d{3,}$/.test(h)) return true;
-	// 单字符重复3次及以上
-	if (/^(.)\1{2,}$/.test(h)) return true;
-	// 常见随意用户名/弱用户名集合
-	const banned = new Set([
-		'123', '1234', '12345', '123456', '000', '0000', '111', '1111',
-		'qwe', 'qwer', 'qwert', 'qwerty', 'asdf', 'zxc', 'zxcv', 'zxcvb', 'qaz', 'qazwsx',
-		'test', 'tester', 'testing', 'guest', 'user', 'username', 'admin', 'root', 'null', 'void',
-		'abc', 'abcd', 'abcdef'
-	]);
-	if (banned.has(h)) return true;
-	return false;
+    if (!handle) return true;
+    const h = String(handle).toLowerCase();
+    // 纯数字，长度>=3
+    if (/^\d{3,}$/.test(h)) return true;
+    // 单字符重复3次及以上
+    if (/^(.)\1{2,}$/.test(h)) return true;
+    // 常见随意用户名/弱用户名集合
+    const banned = new Set([
+        '123', '1234', '12345', '123456', '000', '0000', '111', '1111',
+        'qwe', 'qwer', 'qwert', 'qwerty', 'asdf', 'zxc', 'zxcv', 'zxcvb', 'qaz', 'qazwsx',
+        'test', 'tester', 'testing', 'guest', 'user', 'username', 'admin', 'root', 'null', 'void',
+        'abc', 'abcd', 'abcdef',
+    ]);
+    if (banned.has(h)) return true;
+    return false;
 }
 
 router.post('/list', async (_request, response) => {
@@ -125,7 +124,7 @@ router.post('/login', async (request, response) => {
             return response.status(403).json({
                 error: '您的账户已到期，请续费后再使用',
                 expired: true,
-                purchaseLink: purchaseLink || ''
+                purchaseLink: purchaseLink || '',
             });
         }
 
@@ -196,7 +195,7 @@ router.post('/heartbeat', async (request, response) => {
         // 更新用户活动状态
         systemMonitor.updateUserActivity(userHandle, {
             userName: user.name,
-            isHeartbeat: true
+            isHeartbeat: true,
         });
 
         // 更新session的最后活动时间
@@ -297,7 +296,7 @@ router.post('/recover-step1', async (request, response) => {
                 return response.json({
                     success: true,
                     method: 'email',
-                    message: '密码恢复码已发送至您的邮箱'
+                    message: '密码恢复码已发送至您的邮箱',
                 });
             } else {
                 console.error('Failed to send recovery code to email, falling back to console');
@@ -313,7 +312,7 @@ router.post('/recover-step1', async (request, response) => {
         return response.json({
             success: true,
             method: 'console',
-            message: '密码恢复码已显示在服务器控制台，请联系管理员获取'
+            message: '密码恢复码已显示在服务器控制台，请联系管理员获取',
         });
     } catch (error) {
         if (error instanceof RateLimiterRes) {
@@ -452,17 +451,17 @@ router.post('/register', async (request, response) => {
             return response.status(400).json({ error: '用户名无效' });
         }
 
-		// 验证用户名只包含字母和数字，不允许任何符号
-		if (!/^[a-z0-9]+$/.test(normalizedHandle)) {
-			console.warn('Register failed: Handle contains invalid characters:', normalizedHandle);
-			return response.status(400).json({ error: '用户名只能包含字母和数字，不允许使用符号' });
-		}
+        // 验证用户名只包含字母和数字，不允许任何符号
+        if (!/^[a-z0-9]+$/.test(normalizedHandle)) {
+            console.warn('Register failed: Handle contains invalid characters:', normalizedHandle);
+            return response.status(400).json({ error: '用户名只能包含字母和数字，不允许使用符号' });
+        }
 
-		// 限制随意/弱用户名
-		if (isTrivialHandle(normalizedHandle)) {
-			console.warn('Register failed: Trivial/weak handle not allowed:', normalizedHandle);
-			return response.status(400).json({ error: '用户名过于简单，请使用更有辨识度的用户名' });
-		}
+        // 限制随意/弱用户名
+        if (isTrivialHandle(normalizedHandle)) {
+            console.warn('Register failed: Trivial/weak handle not allowed:', normalizedHandle);
+            return response.status(400).json({ error: '用户名过于简单，请使用更有辨识度的用户名' });
+        }
 
         if (handles.some(x => x === normalizedHandle)) {
             console.warn('Register failed: User with that handle already exists');
@@ -562,7 +561,7 @@ router.get('/me', async (request, response) => {
             avatar: avatar,
             password: !!user.password,
             expiresAt: user.expiresAt || null,
-            email: user.email || null
+            email: user.email || null,
         });
     } catch (error) {
         console.error('Get current user failed:', error);
@@ -621,7 +620,7 @@ router.post('/renew', async (request, response) => {
         return response.json({
             success: true,
             expiresAt: newExpiresAt,
-            message: newExpiresAt ? '续费成功，到期时间：' + new Date(newExpiresAt).toLocaleString() : '续费成功，您的账户已升级为永久账户'
+            message: newExpiresAt ? '续费成功，到期时间：' + new Date(newExpiresAt).toLocaleString() : '续费成功，您的账户已升级为永久账户',
         });
     } catch (error) {
         console.error('Renew failed:', error);
@@ -688,7 +687,7 @@ router.post('/renew-expired', async (request, response) => {
         return response.json({
             success: true,
             expiresAt: newExpiresAt,
-            message: newExpiresAt ? '续费成功，到期时间：' + new Date(newExpiresAt).toLocaleString() : '续费成功，您的账户已升级为永久账户'
+            message: newExpiresAt ? '续费成功，到期时间：' + new Date(newExpiresAt).toLocaleString() : '续费成功，您的账户已升级为永久账户',
         });
     } catch (error) {
         console.error('Renew-expired failed:', error);

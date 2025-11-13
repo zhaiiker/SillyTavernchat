@@ -900,7 +900,7 @@ export async function setUserDataMiddleware(request, response, next) {
         const errorResponse = {
             error: '用户账户已过期',
             expired: true,
-            message: '您的账户已过期，请重新登录并续费'
+            message: '您的账户已过期，请重新登录并续费',
         };
 
         if (purchaseLink) {
@@ -920,34 +920,34 @@ export async function setUserDataMiddleware(request, response, next) {
     if (request.method === 'GET' && request.path === '/') {
         request.session.touch = Date.now();
     }
-// 记录用户会话活动到系统监控器
-const now = Date.now();
-const lastActivity = request.session.lastActivity || 0;
-const timeSinceLastActivity = now - lastActivity;
+    // 记录用户会话活动到系统监控器
+    const now = Date.now();
+    const lastActivity = request.session.lastActivity || 0;
+    const timeSinceLastActivity = now - lastActivity;
 
-// 判断是否为重要页面请求（非静态资源）
-const isImportantRequest = !request.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/i) &&
-                          !request.path.startsWith('/api/') ||
-                          request.path.startsWith('/api/chats') ||
-                          request.path.startsWith('/api/users/heartbeat');
+    // 判断是否为重要页面请求（非静态资源）
+    const isImportantRequest = !request.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/i) &&
+                              !request.path.startsWith('/api/') ||
+                              request.path.startsWith('/api/chats') ||
+                              request.path.startsWith('/api/users/heartbeat');
 
-// 新会话阈值：5分钟没有重要活动，或15分钟没有任何活动
-const newSessionThreshold = isImportantRequest ? 5 * 60 * 1000 : 15 * 60 * 1000;
+    // 新会话阈值：5分钟没有重要活动，或15分钟没有任何活动
+    const newSessionThreshold = isImportantRequest ? 5 * 60 * 1000 : 15 * 60 * 1000;
 
-if (timeSinceLastActivity > newSessionThreshold) {
-    // 开始新会话
-    systemMonitor.recordUserLogin(handle, { userName: user.name });
-    console.log(`New session started for ${handle} after ${Math.floor(timeSinceLastActivity / 60000)} minutes of inactivity`);
-} else if (isImportantRequest) {
-    // 更新用户活动状态（仅对重要请求）
-    systemMonitor.updateUserActivity(handle, {
-        userName: user.name,
-        requestType: request.method + ' ' + request.path
-    });
-}
+    if (timeSinceLastActivity > newSessionThreshold) {
+        // 开始新会话
+        systemMonitor.recordUserLogin(handle, { userName: user.name });
+        console.log(`New session started for ${handle} after ${Math.floor(timeSinceLastActivity / 60000)} minutes of inactivity`);
+    } else if (isImportantRequest) {
+        // 更新用户活动状态（仅对重要请求）
+        systemMonitor.updateUserActivity(handle, {
+            userName: user.name,
+            requestType: request.method + ' ' + request.path,
+        });
+    }
 
-// 更新最后活动时间（所有请求）
-request.session.lastActivity = now;
+    // 更新最后活动时间（所有请求）
+    request.session.lastActivity = now;
 
     return next();
 }

@@ -49,7 +49,7 @@ function getDurationDays(durationType) {
         '1quarter': 90,
         '6months': 180,
         '1year': 365,
-        'permanent': null
+        'permanent': null,
     };
     return durationMap[durationType] ?? null;
 }
@@ -78,7 +78,7 @@ export async function createInvitationCode(createdBy, durationType = 'permanent'
         usedAt: null,
         durationType: durationType || 'permanent',
         durationDays,
-        userExpiresAt: null  // 使用后会设置为用户的到期时间
+        userExpiresAt: null,  // 使用后会设置为用户的到期时间
     };
 
     await storage.setItem(toInvitationKey(code), invitation);
@@ -216,12 +216,12 @@ export async function cleanupExpiredInvitationCodes() {
         return 0;
     }
 
-    const invitations = await getAllInvitationCodes();
     let cleanedCount = 0;
 
     // 只清理已使用的邀请码（可选）
     // 注释掉此功能，因为已使用的邀请码可能需要保留用于记录
     /*
+    const invitations = await getAllInvitationCodes();
     for (const invitation of invitations) {
         if (invitation.used) {
             await deleteInvitationCode(invitation.code);

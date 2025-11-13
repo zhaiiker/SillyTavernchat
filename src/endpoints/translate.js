@@ -1,10 +1,9 @@
-import { createRequire } from 'node:module';
-
 import fetch from 'node-fetch';
 import express from 'express';
 import { translate as bingTranslate } from 'bing-translate-api';
 import iconv from 'iconv-lite';
 import urlJoin from 'url-join';
+import { generateRequestUrl, normaliseResponse } from 'google-translate-api-browser';
 
 import { readSecret, SECRET_KEYS } from './secrets.js';
 import { getConfigValue, uuidv4 } from '../util.js';
@@ -14,16 +13,6 @@ const ONERING_URL_DEFAULT = 'http://127.0.0.1:4990/translate';
 const LINGVA_DEFAULT = 'https://lingva.ml/api/v1';
 
 export const router = express.Router();
-
-/**
- * Get the Google Translate API client.
- * @returns {import('google-translate-api-browser')} Google Translate API client
- */
-function getGoogleTranslateClient() {
-    const require = createRequire(import.meta.url);
-    const googleTranslateApi = require('google-translate-api-browser');
-    return googleTranslateApi;
-}
 
 /**
  * Tries to decode an ArrayBuffer to a string using iconv-lite for UTF-8.
@@ -110,7 +99,6 @@ router.post('/google', async (request, response) => {
 
         console.debug('Input text: ' + text);
 
-        const { generateRequestUrl, normaliseResponse } = getGoogleTranslateClient();
         const requestUrl = generateRequestUrl(text, { to: lang });
         const result = await fetch(requestUrl);
 

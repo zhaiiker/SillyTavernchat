@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { requireAdminMiddleware } from '../users.js';
-import { humanizedISO8601DateTime } from '../util.js';
 
 const ANNOUNCEMENTS_DIR = path.join(process.cwd(), 'data', 'announcements');
 const ANNOUNCEMENTS_FILE = path.join(ANNOUNCEMENTS_DIR, 'announcements.json');
@@ -130,7 +129,7 @@ router.post('/', requireAdminMiddleware, async (request, response) => {
             enabled: enabled !== false,
             createdAt: now,
             updatedAt: now,
-            createdBy: request.user.profile.handle
+            createdBy: request.user.profile.handle,
         };
 
         announcements.unshift(newAnnouncement);
@@ -289,7 +288,7 @@ router.post('/login', requireAdminMiddleware, async (request, response) => {
             enabled: enabled !== false,
             createdAt: now,
             updatedAt: now,
-            createdBy: request.user.profile.handle
+            createdBy: request.user.profile.handle,
         };
 
         announcements.unshift(newAnnouncement);

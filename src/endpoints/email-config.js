@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'yaml';
 import express from 'express';
-import { getConfigValue } from '../util.js';
 import { getEmailConfig, testEmailConfig, reloadEmailConfig } from '../email-service.js';
 import { requireAdminMiddleware } from '../users.js';
 

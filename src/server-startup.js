@@ -54,7 +54,6 @@ import { router as publicCharactersRouter } from './endpoints/public-characters.
 import { router as announcementsRouter } from './endpoints/announcements.js';
 import { router as publicConfigRouter } from './endpoints/public-config.js';
 import { router as emailConfigRouter } from './endpoints/email-config.js';
-import { router as emailStatusRouter } from './endpoints/email-status.js';
 import { getConfigValue } from './util.js';
 
 /**
@@ -184,24 +183,24 @@ export function setupPrivateEndpoints(app) {
     app.use('/api/azure', azureRouter);
     app.use('/api/minimax', minimaxRouter);
     app.use('/api/data-maid', dataMaidRouter);
-        // 根据配置控制论坛API路由
-        const enableForum = getConfigValue('enableForum', true, 'boolean');
-        if (enableForum) {
-            app.use('/api/forum', forumRouter);
-        }
+    // 根据配置控制论坛API路由
+    const enableForum = getConfigValue('enableForum', true, 'boolean');
+    if (enableForum) {
+        app.use('/api/forum', forumRouter);
+    }
 
-        app.use('/api/invitation-codes', invitationCodesRouter);
-        app.use('/api/email-config', emailConfigRouter);
-        app.use('/api/system-load', systemLoadRouter);
+    app.use('/api/invitation-codes', invitationCodesRouter);
+    app.use('/api/email-config', emailConfigRouter);
+    app.use('/api/system-load', systemLoadRouter);
 
-        // 根据配置控制角色卡分享API路由
-        const enablePublicCharacters = getConfigValue('enablePublicCharacters', true, 'boolean');
-        if (enablePublicCharacters) {
-            app.use('/api/public-characters', publicCharactersRouter);
-        }
+    // 根据配置控制角色卡分享API路由
+    const enablePublicCharacters = getConfigValue('enablePublicCharacters', true, 'boolean');
+    if (enablePublicCharacters) {
+        app.use('/api/public-characters', publicCharactersRouter);
+    }
 
-        app.use('/api/announcements', announcementsRouter);
-        app.use('/api/public-config', publicConfigRouter);
+    app.use('/api/announcements', announcementsRouter);
+    app.use('/api/public-config', publicConfigRouter);
 }
 
 /**
