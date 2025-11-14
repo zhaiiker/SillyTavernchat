@@ -113,6 +113,7 @@ const STORAGE_KEYS = {
  * @returns {Promise<import('./users.js').UserDirectoryList[]>} - The list of user directories
  */
 export async function ensurePublicDirectoriesExist() {
+    // 首先确保公共目录存在
     for (const dir of Object.values(PUBLIC_DIRECTORIES)) {
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -121,13 +122,37 @@ export async function ensurePublicDirectoriesExist() {
 
     const userHandles = await getAllUserHandles();
     const directoriesList = userHandles.map(handle => getUserDirectories(handle));
-    for (const userDirectories of directoriesList) {
-        for (const dir of Object.values(userDirectories)) {
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
+
+    // 并发处理所有用户目录创建，每批处理50个用户
+    const BATCH_SIZE = 50;
+    const totalUsers = directoriesList.length;
+
+    if (totalUsers > 20) {
+        console.log(`正在创建 ${totalUsers} 个用户的目录结构...`);
+    }
+
+    for (let i = 0; i < directoriesList.length; i += BATCH_SIZE) {
+        const batch = directoriesList.slice(i, i + BATCH_SIZE);
+
+        // 并发处理当前批次
+        await Promise.all(batch.map(async (userDirectories) => {
+            for (const dir of Object.values(userDirectories)) {
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true });
+                }
             }
+        }));
+
+        if (totalUsers > 20) {
+            const processed = Math.min(i + BATCH_SIZE, totalUsers);
+            console.log(`  目录创建进度: ${processed}/${totalUsers}`);
         }
     }
+
+    if (totalUsers > 20) {
+        console.log(`✓ 所有用户目录创建完成`);
+    }
+
     return directoriesList;
 }
 

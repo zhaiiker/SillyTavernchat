@@ -106,6 +106,10 @@ function showSystemLoadTab() {
     // 隐藏其他选项卡
     hideAllTabs();
 
+    // 重置分页和搜索状态
+    currentUserPage = 1;
+    userSearchTerm = '';
+
     // 显示系统负载选项卡
     const systemLoadBlock = document.querySelector('.systemLoadBlock');
     if (systemLoadBlock) {
@@ -121,6 +125,10 @@ function showSystemLoadTab() {
 function showInvitationCodesTab() {
     // 隐藏其他选项卡
     hideAllTabs();
+
+    // 重置分页状态
+    currentCodePage = 1;
+    codeSearchTerm = '';
 
     // 显示邀请码管理选项卡
     const invitationCodesBlock = document.querySelector('.invitationCodesBlock');
@@ -292,6 +300,12 @@ function updateSystemOverview(systemData) {
     }
 }
 
+// 用户活动分页相关
+let currentUserPage = 1;
+const usersPerPage = 20; // 每页显示20个用户
+let filteredUsers = [];
+let userSearchTerm = '';
+
 // 更新用户统计
 function updateUserActivity(usersData) {
     const userActivityList = document.getElementById('userActivityList');
@@ -302,8 +316,146 @@ function updateUserActivity(usersData) {
         return;
     }
 
-    const userActivityHtml = usersData.map(user => createUserActivityItem(user)).join('');
-    userActivityList.innerHTML = userActivityHtml;
+    // 应用搜索过滤
+    filteredUsers = userSearchTerm ? usersData.filter(user =>
+        (user.userName && user.userName.toLowerCase().includes(userSearchTerm.toLowerCase())) ||
+        (user.userHandle && user.userHandle.toLowerCase().includes(userSearchTerm.toLowerCase()))
+    ) : usersData;
+
+    // 计算分页
+    const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+    const startIndex = (currentUserPage - 1) * usersPerPage;
+    const endIndex = startIndex + usersPerPage;
+    const pageUsers = filteredUsers.slice(startIndex, endIndex);
+
+    // 渲染用户列表
+    const userActivityHtml = pageUsers.map(user => createUserActivityItem(user)).join('');
+
+    // 创建分页控件
+    const paginationHtml = createPaginationControls(currentUserPage, totalPages, filteredUsers.length);
+
+    userActivityList.innerHTML = `
+        <div class="userActivityControls">
+            <input type="text" id="userSearchInput" placeholder="搜索用户名或句柄..."
+                   value="${userSearchTerm}" class="text_pole" style="flex: 1; margin-right: 10px;">
+            <span class="userCount" style="white-space: nowrap; opacity: 0.7;">
+                显示 ${startIndex + 1}-${Math.min(endIndex, filteredUsers.length)} / ${filteredUsers.length} 用户
+            </span>
+        </div>
+        ${paginationHtml}
+        <div class="userActivityListContent">${userActivityHtml}</div>
+        ${paginationHtml}
+    `;
+
+    // 绑定搜索事件
+    const searchInput = document.getElementById('userSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounceSearch(function(e) {
+            userSearchTerm = e.target.value.trim();
+            currentUserPage = 1; // 重置到第一页
+            updateUserActivity(currentSystemData.users);
+        }, 300));
+    }
+
+    // 绑定分页按钮事件
+    bindPaginationEvents();
+}
+
+// 创建分页控件
+function createPaginationControls(currentPage, totalPages, totalUsers) {
+    if (totalPages <= 1) return '';
+
+    let html = '<div class="paginationControls" style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 15px 0;">';
+
+    // 上一页按钮
+    if (currentPage > 1) {
+        html += `<button class="menu_button pagination-btn" data-page="${currentPage - 1}">
+            <i class="fa-solid fa-chevron-left"></i> 上一页
+        </button>`;
+    } else {
+        html += `<button class="menu_button" disabled style="opacity: 0.5;">
+            <i class="fa-solid fa-chevron-left"></i> 上一页
+        </button>`;
+    }
+
+    // 页码按钮
+    const maxButtons = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    // 调整起始页
+    if (endPage - startPage < maxButtons - 1) {
+        startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+
+    // 第一页
+    if (startPage > 1) {
+        html += `<button class="menu_button pagination-btn" data-page="1">1</button>`;
+        if (startPage > 2) {
+            html += `<span style="opacity: 0.5;">...</span>`;
+        }
+    }
+
+    // 中间页码
+    for (let i = startPage; i <= endPage; i++) {
+        if (i === currentPage) {
+            html += `<button class="menu_button" disabled style="background: var(--SmartThemeBlurTintColor);">${i}</button>`;
+        } else {
+            html += `<button class="menu_button pagination-btn" data-page="${i}">${i}</button>`;
+        }
+    }
+
+    // 最后一页
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<span style="opacity: 0.5;">...</span>`;
+        }
+        html += `<button class="menu_button pagination-btn" data-page="${totalPages}">${totalPages}</button>`;
+    }
+
+    // 下一页按钮
+    if (currentPage < totalPages) {
+        html += `<button class="menu_button pagination-btn" data-page="${currentPage + 1}">
+            下一页 <i class="fa-solid fa-chevron-right"></i>
+        </button>`;
+    } else {
+        html += `<button class="menu_button" disabled style="opacity: 0.5;">
+            下一页 <i class="fa-solid fa-chevron-right"></i>
+        </button>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// 绑定分页按钮事件
+function bindPaginationEvents() {
+    const paginationBtns = document.querySelectorAll('.pagination-btn');
+    paginationBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentUserPage = parseInt(this.dataset.page);
+            updateUserActivity(currentSystemData.users);
+
+            // 滚动到顶部
+            const userActivityList = document.getElementById('userActivityList');
+            if (userActivityList) {
+                userActivityList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+}
+
+// 防抖函数
+function debounceSearch(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }
 
 // 创建用户统计项目
@@ -430,6 +582,11 @@ async function clearSystemStats() {
         alert('清除统计数据失败');
     }
 }
+
+// 邀请码分页相关
+let currentCodePage = 1;
+const codesPerPage = 50; // 每页显示50个邀请码
+let codeSearchTerm = '';
 
 // 邀请码管理相关功能
 function bindInvitationCodeEvents() {
@@ -699,20 +856,161 @@ function renderInvitationCodes() {
         }
     }
 
+    // 按搜索词筛选
+    if (codeSearchTerm) {
+        filteredCodes = filteredCodes.filter(code =>
+            code.code.toLowerCase().includes(codeSearchTerm.toLowerCase()) ||
+            (code.createdBy && code.createdBy.toLowerCase().includes(codeSearchTerm.toLowerCase())) ||
+            (code.usedBy && code.usedBy.toLowerCase().includes(codeSearchTerm.toLowerCase()))
+        );
+    }
+
     // 显示筛选结果
     if (filteredCodes.length === 0) {
-        container.innerHTML = createEmptyState('fa-filter', '没有符合条件的邀请码', '请调整筛选条件');
+        container.innerHTML = createEmptyState('fa-filter', '没有符合条件的邀请码', '请调整筛选条件或搜索词');
         return;
     }
 
-    const codesHtml = filteredCodes.map(code => createInvitationCodeItem(code)).join('');
-    container.innerHTML = codesHtml;
+    // 计算分页
+    const totalPages = Math.ceil(filteredCodes.length / codesPerPage);
+
+    // 如果当前页超出范围，自动调整到最后一页
+    if (currentCodePage > totalPages) {
+        currentCodePage = Math.max(1, totalPages);
+    }
+
+    const startIndex = (currentCodePage - 1) * codesPerPage;
+    const endIndex = startIndex + codesPerPage;
+    const pageCodes = filteredCodes.slice(startIndex, endIndex);
+
+    // 创建搜索框和统计信息
+    const controlsHtml = `
+        <div class="invitationCodeControls" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding: 10px; background: var(--SmartThemeBlurTintColor); border-radius: 10px;">
+            <input type="text" id="codeSearchInput" placeholder="搜索邀请码、创建者或使用者..."
+                   value="${escapeHtml(codeSearchTerm)}" class="text_pole" style="flex: 1;">
+            <span class="codeCount" style="white-space: nowrap; opacity: 0.7; font-size: 0.9em; padding: 5px 10px; background: var(--black30a); border-radius: 5px;">
+                显示 ${startIndex + 1}-${Math.min(endIndex, filteredCodes.length)} / ${filteredCodes.length} 个邀请码
+            </span>
+        </div>
+    `;
+
+    // 创建分页控件
+    const paginationHtml = createCodePaginationControls(currentCodePage, totalPages, filteredCodes.length);
+
+    // 渲染邀请码列表
+    const codesHtml = pageCodes.map(code => createInvitationCodeItem(code)).join('');
+
+    container.innerHTML = `
+        ${controlsHtml}
+        ${paginationHtml}
+        <div class="invitationCodeListContent" style="display: flex; flex-direction: column; gap: 10px;">
+            ${codesHtml}
+        </div>
+        ${paginationHtml}
+    `;
+
+    // 绑定搜索事件
+    const searchInput = document.getElementById('codeSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounceSearch(function(e) {
+            codeSearchTerm = e.target.value.trim();
+            currentCodePage = 1; // 重置到第一页
+            renderInvitationCodes();
+        }, 300));
+    }
 
     // 绑定删除按钮事件
     bindInvitationCodeDeleteEvents();
 
+    // 绑定分页按钮事件
+    bindCodePaginationEvents();
+
     // 更新全选按钮状态
     updateSelectAllButton();
+}
+
+// 创建邀请码分页控件
+function createCodePaginationControls(currentPage, totalPages, totalCodes) {
+    if (totalPages <= 1) return '';
+
+    let html = '<div class="paginationControls" style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 15px 0; flex-wrap: wrap;">';
+
+    // 上一页按钮
+    if (currentPage > 1) {
+        html += `<button class="menu_button code-pagination-btn" data-page="${currentPage - 1}">
+            <i class="fa-solid fa-chevron-left"></i> 上一页
+        </button>`;
+    } else {
+        html += `<button class="menu_button" disabled style="opacity: 0.5;">
+            <i class="fa-solid fa-chevron-left"></i> 上一页
+        </button>`;
+    }
+
+    // 页码按钮
+    const maxButtons = 7;
+    let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    // 调整起始页
+    if (endPage - startPage < maxButtons - 1) {
+        startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+
+    // 第一页
+    if (startPage > 1) {
+        html += `<button class="menu_button code-pagination-btn" data-page="1">1</button>`;
+        if (startPage > 2) {
+            html += `<span style="opacity: 0.5;">...</span>`;
+        }
+    }
+
+    // 中间页码
+    for (let i = startPage; i <= endPage; i++) {
+        if (i === currentPage) {
+            html += `<button class="menu_button" disabled style="background: var(--SmartThemeBlurTintColor);">${i}</button>`;
+        } else {
+            html += `<button class="menu_button code-pagination-btn" data-page="${i}">${i}</button>`;
+        }
+    }
+
+    // 最后一页
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<span style="opacity: 0.5;">...</span>`;
+        }
+        html += `<button class="menu_button code-pagination-btn" data-page="${totalPages}">${totalPages}</button>`;
+    }
+
+    // 下一页按钮
+    if (currentPage < totalPages) {
+        html += `<button class="menu_button code-pagination-btn" data-page="${currentPage + 1}">
+            下一页 <i class="fa-solid fa-chevron-right"></i>
+        </button>`;
+    } else {
+        html += `<button class="menu_button" disabled style="opacity: 0.5;">
+            下一页 <i class="fa-solid fa-chevron-right"></i>
+        </button>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// 绑定邀请码分页按钮事件
+function bindCodePaginationEvents() {
+    const paginationBtns = document.querySelectorAll('.code-pagination-btn');
+    paginationBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentCodePage = parseInt(this.dataset.page);
+            renderInvitationCodes();
+
+            // 滚动到顶部
+            const container = document.getElementById('invitationCodesContainer');
+            if (container) {
+                container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
 }
 
 // 创建邀请码项目
@@ -827,6 +1125,9 @@ async function createInvitationCode() {
         // 清空表单
         form.reset();
 
+        // 重置到第一页显示新创建的邀请码
+        currentCodePage = 1;
+
         // 重新加载邀请码列表
         loadInvitationCodes();
 
@@ -921,6 +1222,9 @@ async function createBatchInvitationCodes() {
         // 清空表单
         form.reset();
         form.querySelector('input[name="batchCount"]').value = '10';
+
+        // 重置到第一页显示新创建的邀请码
+        currentCodePage = 1;
 
         // 重新加载邀请码列表
         loadInvitationCodes();

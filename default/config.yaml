@@ -161,6 +161,10 @@ backups:
 thumbnails:
   # Enable thumbnail generation
   enabled: true
+  # Skip thumbnail generation during server startup (recommended for large user bases)
+  # Thumbnails will be generated on-demand when first requested (lazy loading)
+  # Set to true to speed up startup time significantly with many users
+  skipStartupGeneration: true
   # Image format of avatar thumbnails:
   # * "jpg": best compression with adjustable quality, no transparency
   # * "png": preserves transparency but increases filesize by about 100%

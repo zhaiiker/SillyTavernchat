@@ -201,6 +201,51 @@
                 </div>
             </div>
 
+            <style>
+                .userActivityControls {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 15px;
+                    padding: 10px;
+                    background: var(--SmartThemeBlurTintColor);
+                    border-radius: 10px;
+                }
+
+                .userActivityListContent {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }
+
+                .paginationControls {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    margin: 15px 0;
+                    flex-wrap: wrap;
+                }
+
+                .paginationControls .menu_button {
+                    min-width: 40px;
+                    padding: 8px 12px;
+                }
+
+                .pagination-btn:hover {
+                    background: var(--SmartThemeBlurTintColor);
+                    transform: translateY(-2px);
+                    transition: all 0.2s;
+                }
+
+                .userCount {
+                    font-size: 0.9em;
+                    padding: 5px 10px;
+                    background: var(--black30a);
+                    border-radius: 5px;
+                }
+            </style>
+
             <!-- 操作按钮 -->
             <div class="flex-container justifyCenter flexGap10">
                 <button type="button" class="menu_button menu_button_icon" id="refreshSystemLoad">

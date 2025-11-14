@@ -67,10 +67,13 @@ async function calculateDirectorySize(dirPath) {
     return totalSize;
 }
 
-router.post('/get', requireAdminMiddleware, async (_request, response) => {
+router.post('/get', requireAdminMiddleware, async (request, response) => {
     try {
         /** @type {import('../users.js').User[]} */
         const users = await storage.values(x => x.key.startsWith(KEY_PREFIX));
+
+        // 是否计算存储大小（默认为false以提高性能）
+        const includeStorageSize = request.body?.includeStorageSize === true;
 
         /** @type {Promise<AdminUserViewModel>[]} */
         const viewModelPromises = users
@@ -79,9 +82,12 @@ router.post('/get', requireAdminMiddleware, async (_request, response) => {
                 // 获取用户负载统计（如果可用）
                 const loadStats = systemMonitor.getUserLoadStats(user.handle);
 
-                // 计算用户目录大小
-                const directories = getUserDirectories(user.handle);
-                const storageSize = await calculateDirectorySize(directories.root);
+                // 只有在明确请求时才计算用户目录大小
+                let storageSize = undefined;
+                if (includeStorageSize) {
+                    const directories = getUserDirectories(user.handle);
+                    storageSize = await calculateDirectorySize(directories.root);
+                }
 
                 resolve({
                     handle: user.handle,
@@ -106,6 +112,46 @@ router.post('/get', requireAdminMiddleware, async (_request, response) => {
         return response.json(viewModels);
     } catch (error) {
         console.error('User list failed:', error);
+        return response.sendStatus(500);
+    }
+});
+
+/**
+ * 获取指定用户的存储占用大小
+ * 支持单个用户或批量查询
+ */
+router.post('/storage-size', requireAdminMiddleware, async (request, response) => {
+    try {
+        const { handles } = request.body;
+
+        if (!handles || !Array.isArray(handles) || handles.length === 0) {
+            console.warn('Get storage size failed: Missing or invalid handles');
+            return response.status(400).json({ error: 'Missing or invalid handles array' });
+        }
+
+        const results = {};
+
+        // 并行计算所有用户的存储大小
+        await Promise.all(handles.map(async (handle) => {
+            try {
+                const normalizedHandle = normalizeHandle(handle);
+                if (!normalizedHandle) {
+                    results[handle] = { error: 'Invalid handle format' };
+                    return;
+                }
+
+                const directories = getUserDirectories(normalizedHandle);
+                const storageSize = await calculateDirectorySize(directories.root);
+                results[normalizedHandle] = { storageSize };
+            } catch (error) {
+                console.error(`Error calculating storage size for ${handle}:`, error);
+                results[handle] = { error: error.message };
+            }
+        }));
+
+        return response.json(results);
+    } catch (error) {
+        console.error('Get storage size failed:', error);
         return response.sendStatus(500);
     }
 });

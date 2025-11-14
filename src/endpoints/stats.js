@@ -160,20 +160,44 @@ export async function recreateStats(handle, chatsPath, charactersPath) {
 export async function init() {
     try {
         const userHandles = await getAllUserHandles();
-        for (const handle of userHandles) {
-            const directories = getUserDirectories(handle);
-            try {
-                const statsFilePath = path.join(directories.root, STATS_FILE);
-                const statsFileContent = await readFile(statsFilePath, 'utf-8');
-                STATS.set(handle, JSON.parse(statsFileContent));
-            } catch (err) {
-                // If the file doesn't exist or is invalid, initialize stats
-                if (err.code === 'ENOENT' || err instanceof SyntaxError) {
-                    await recreateStats(handle, directories.chats, directories.characters);
-                } else {
-                    throw err; // Rethrow the error if it's something we didn't expect
+        const totalUsers = userHandles.length;
+
+        if (totalUsers > 20) {
+            console.log(`正在加载 ${totalUsers} 个用户的统计数据...`);
+        }
+
+        // 并发处理所有用户的统计数据，每批处理30个用户
+        const BATCH_SIZE = 30;
+        let processed = 0;
+
+        for (let i = 0; i < userHandles.length; i += BATCH_SIZE) {
+            const batch = userHandles.slice(i, i + BATCH_SIZE);
+
+            // 并发处理当前批次
+            await Promise.all(batch.map(async (handle) => {
+                const directories = getUserDirectories(handle);
+                try {
+                    const statsFilePath = path.join(directories.root, STATS_FILE);
+                    const statsFileContent = await readFile(statsFilePath, 'utf-8');
+                    STATS.set(handle, JSON.parse(statsFileContent));
+                } catch (err) {
+                    // If the file doesn't exist or is invalid, initialize stats
+                    if (err.code === 'ENOENT' || err instanceof SyntaxError) {
+                        await recreateStats(handle, directories.chats, directories.characters);
+                    } else {
+                        console.error(`Error loading stats for user ${handle}:`, err);
+                    }
                 }
+            }));
+
+            processed += batch.length;
+            if (totalUsers > 20) {
+                console.log(`  统计数据加载进度: ${Math.min(processed, totalUsers)}/${totalUsers}`);
             }
+        }
+
+        if (totalUsers > 20) {
+            console.log(`✓ 所有用户统计数据加载完成`);
         }
     } catch (err) {
         console.error('Failed to initialize stats:', err);

@@ -178,13 +178,15 @@ async function getCurrentUser() {
 
 /**
  * Get a list of all users.
+ * @param {boolean} includeStorageSize - 是否包含存储大小信息（默认false以提高性能）
  * @returns {Promise<import('../../src/users.js').UserViewModel[]>} Users
  */
-async function getUsers() {
+async function getUsers(includeStorageSize = false) {
     try {
         const response = await fetch('/api/users/get', {
             method: 'POST',
             headers: getRequestHeaders(),
+            body: JSON.stringify({ includeStorageSize }),
         });
 
         if (!response.ok) {
@@ -194,6 +196,30 @@ async function getUsers() {
         return response.json();
     } catch (error) {
         console.error('Error getting users:', error);
+    }
+}
+
+/**
+ * 批量获取用户的存储占用大小
+ * @param {string[]} handles - 用户句柄数组
+ * @returns {Promise<Object.<string, {storageSize?: number, error?: string}>>} 用户存储大小映射
+ */
+async function getUsersStorageSize(handles) {
+    try {
+        const response = await fetch('/api/users/storage-size', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({ handles }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to get users storage size');
+        }
+
+        return response.json();
+    } catch (error) {
+        console.error('Error getting users storage size:', error);
+        return {};
     }
 }
 
@@ -1144,10 +1170,92 @@ async function changeAvatar(handle, avatar) {
 }
 
 async function openAdminPanel() {
+    // 用户列表分页相关变量
+    let currentUserPage = 1;
+    const usersPerPage = 20; // 每页显示20个用户
+    let userSearchTerm = '';
+    let allUsers = []; // 存储所有用户数据
+
     async function renderUsers() {
-        const users = await getUsers();
-        template.find('.usersList .userAccount').remove(); // 清除旧的用户列表，保留按钮区域
-        for (const user of users) {
+        // 先快速加载用户列表（不包含存储大小）
+        const users = await getUsers(false);
+        allUsers = users; // 保存所有用户数据
+
+        // 应用搜索过滤
+        let filteredUsers = users;
+        if (userSearchTerm) {
+            filteredUsers = users.filter(user =>
+                user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                user.handle.toLowerCase().includes(userSearchTerm.toLowerCase())
+            );
+        }
+
+        // 计算分页
+        const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+
+        // 如果当前页超出范围，自动调整到最后一页
+        if (currentUserPage > totalPages && totalPages > 0) {
+            currentUserPage = totalPages;
+        } else if (totalPages === 0) {
+            currentUserPage = 1;
+        }
+
+        const startIndex = (currentUserPage - 1) * usersPerPage;
+        const endIndex = startIndex + usersPerPage;
+        const pageUsers = filteredUsers.slice(startIndex, endIndex);
+
+        // 清除旧的用户卡片
+        template.find('.navTab.usersList .userAccount').remove();
+
+        // 确保有用户列表容器
+        let usersListContainer = template.find('.navTab.usersList .usersListContainer');
+        if (usersListContainer.length === 0) {
+            usersListContainer = $('<div class="usersListContainer"></div>');
+            template.find('.navTab.usersList').append(usersListContainer);
+        }
+
+        // 存储用户块的引用，用于后续更新存储大小
+        const userBlocks = new Map();
+
+        // 添加搜索框和统计信息（确保在 navTab 内部）
+        let controlsHtml = template.find('.navTab.usersList .usersListControls');
+        if (controlsHtml.length === 0) {
+            controlsHtml = $(`
+                <div class="usersListControls" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding: 10px; background: var(--SmartThemeBlurTintColor); border-radius: 10px;">
+                    <input type="text" id="userSearchInput" placeholder="搜索用户名或句柄..." value="" class="text_pole" style="flex: 1;">
+                    <span class="userCount" style="white-space: nowrap; opacity: 0.7; font-size: 0.9em; padding: 5px 10px; background: var(--black30a); border-radius: 5px;"></span>
+                </div>
+            `);
+            // 插入到 navTab.usersList 的开头（在已有按钮之后）
+            const navTab = template.find('.navTab.usersList');
+            const existingButtons = navTab.find('.flex-container.justifyCenter').first();
+            if (existingButtons.length > 0) {
+                existingButtons.after(controlsHtml);
+            } else {
+                navTab.prepend(controlsHtml);
+            }
+        }
+
+        controlsHtml.find('#userSearchInput').val(userSearchTerm);
+        controlsHtml.find('.userCount').text(`显示 ${startIndex + 1}-${Math.min(endIndex, filteredUsers.length)} / ${filteredUsers.length} 个用户`);
+
+        // 绑定搜索事件（使用防抖）
+        controlsHtml.find('#userSearchInput').off('input').on('input', debounceSearch(function() {
+            userSearchTerm = $(this).val().trim();
+            currentUserPage = 1; // 重置到第一页
+            renderUsers();
+        }, 300));
+
+        // 如果没有用户，显示提示
+        if (filteredUsers.length === 0) {
+            const emptyMessage = userSearchTerm
+                ? `<div style="text-align: center; padding: 40px; opacity: 0.7;">没有找到匹配的用户</div>`
+                : `<div style="text-align: center; padding: 40px; opacity: 0.7;">暂无用户</div>`;
+            usersListContainer.append(emptyMessage);
+            return;
+        }
+
+        for (const user of pageUsers) {
             const userBlock = template.find('.userAccountTemplate .userAccount').clone();
             userBlock.find('.userName').text(user.name);
             userBlock.find('.userHandle').text(user.handle);
@@ -1158,12 +1266,11 @@ async function openAdminPanel() {
             userBlock.find('.noPassword').toggle(!user.password);
             userBlock.find('.userCreated').text(new Date(user.created).toLocaleString());
 
-            // 显示存储大小
-            if (user.storageSize !== undefined) {
-                userBlock.find('.userStorageSize').text(humanFileSize(user.storageSize));
-            } else {
-                userBlock.find('.userStorageSize').text('计算中...');
-            }
+            // 初始显示"加载中..."
+            userBlock.find('.userStorageSize').text('加载中...');
+
+            // 保存userBlock引用
+            userBlocks.set(user.handle, userBlock);
 
             // 显示到期时间
             if (user.expiresAt) {
@@ -1217,8 +1324,152 @@ async function openAdminPanel() {
                 await changeAvatar(user.handle, '');
                 renderUsers();
             });
-            template.find('.usersList').append(userBlock);
+            usersListContainer.append(userBlock);
         }
+
+        // 添加底部分页控件（添加到 .navTab.usersList 内部，而不是外部）
+        let paginationBottom = template.find('.navTab.usersList .usersPaginationBottom');
+        if (paginationBottom.length === 0) {
+            paginationBottom = $('<div class="usersPaginationBottom"></div>');
+            template.find('.navTab.usersList').append(paginationBottom);
+        }
+        paginationBottom.html(createUserPaginationControls(currentUserPage, totalPages, filteredUsers.length));
+
+        // 绑定分页按钮事件
+        bindUserPaginationEvents();
+
+        // 异步批量加载当前页用户的存储大小
+        if (pageUsers.length > 0) {
+            const userHandles = pageUsers.map(u => u.handle);
+
+            // 分批加载，避免一次性加载太多用户导致请求超时
+            // 每批最多处理20个用户
+            const batchSize = 20;
+            for (let i = 0; i < userHandles.length; i += batchSize) {
+                const batch = userHandles.slice(i, i + batchSize);
+
+                // 延迟一点时间，让UI先渲染出来
+                if (i === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                try {
+                    const storageSizes = await getUsersStorageSize(batch);
+
+                    // 更新UI显示
+                    for (const handle of batch) {
+                        const userBlock = userBlocks.get(handle);
+                        if (userBlock && storageSizes[handle]) {
+                            if (storageSizes[handle].storageSize !== undefined) {
+                                userBlock.find('.userStorageSize').text(humanFileSize(storageSizes[handle].storageSize));
+                            } else if (storageSizes[handle].error) {
+                                userBlock.find('.userStorageSize').text('计算失败');
+                                userBlock.find('.userStorageSize').attr('title', storageSizes[handle].error);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error loading storage size for batch ${i / batchSize + 1}:`, error);
+                    // 如果某批次失败，标记为错误
+                    for (const handle of batch) {
+                        const userBlock = userBlocks.get(handle);
+                        if (userBlock) {
+                            userBlock.find('.userStorageSize').text('加载失败');
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 创建用户分页控件
+    function createUserPaginationControls(currentPage, totalPages, totalUsers) {
+        if (totalPages <= 1) return '';
+
+        let html = '<div class="userPaginationControls" style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 15px 0; flex-wrap: wrap;">';
+
+        // 上一页按钮
+        if (currentPage > 1) {
+            html += `<button class="menu_button user-pagination-btn" data-page="${currentPage - 1}">
+                <i class="fa-solid fa-chevron-left"></i> 上一页
+            </button>`;
+        } else {
+            html += `<button class="menu_button" disabled style="opacity: 0.5;">
+                <i class="fa-solid fa-chevron-left"></i> 上一页
+            </button>`;
+        }
+
+        // 页码按钮
+        const maxButtons = 7;
+        let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+        // 调整起始页
+        if (endPage - startPage < maxButtons - 1) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        // 第一页
+        if (startPage > 1) {
+            html += `<button class="menu_button user-pagination-btn" data-page="1">1</button>`;
+            if (startPage > 2) {
+                html += `<span style="opacity: 0.5;">...</span>`;
+            }
+        }
+
+        // 中间页码
+        for (let i = startPage; i <= endPage; i++) {
+            if (i === currentPage) {
+                html += `<button class="menu_button" disabled style="background: var(--SmartThemeBlurTintColor);">${i}</button>`;
+            } else {
+                html += `<button class="menu_button user-pagination-btn" data-page="${i}">${i}</button>`;
+            }
+        }
+
+        // 最后一页
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span style="opacity: 0.5;">...</span>`;
+            }
+            html += `<button class="menu_button user-pagination-btn" data-page="${totalPages}">${totalPages}</button>`;
+        }
+
+        // 下一页按钮
+        if (currentPage < totalPages) {
+            html += `<button class="menu_button user-pagination-btn" data-page="${currentPage + 1}">
+                下一页 <i class="fa-solid fa-chevron-right"></i>
+            </button>`;
+        } else {
+            html += `<button class="menu_button" disabled style="opacity: 0.5;">
+                下一页 <i class="fa-solid fa-chevron-right"></i>
+            </button>`;
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    // 绑定用户分页按钮事件
+    function bindUserPaginationEvents() {
+        template.find('.user-pagination-btn').off('click').on('click', function() {
+            currentUserPage = parseInt($(this).data('page'));
+            renderUsers();
+
+            // 滚动到顶部
+            const usersListControls = template.find('.usersListControls');
+            if (usersListControls.length > 0) {
+                usersListControls[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+
+    // 防抖函数
+    function debounceSearch(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
     }
 
     const template = $(await renderTemplateAsync('admin'));
@@ -1254,6 +1505,8 @@ if (typeof window.initializeAdminExtensions === 'function') {
         event.preventDefault();
         createUser(event.target, () => {
             template.find('.manageUsersButton').trigger('click');
+            currentUserPage = 1; // 重置到第一页以显示新创建的用户
+            userSearchTerm = ''; // 清空搜索词
             renderUsers();
         });
     });

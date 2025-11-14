@@ -177,13 +177,42 @@ export async function checkForNewContent(directoriesList, forceCategories = []) 
 
         const contentIndex = getContentIndex();
         let anyContentAdded = false;
+        const totalUsers = directoriesList.length;
 
-        for (const directories of directoriesList) {
-            const seedResult = await seedContentForUser(contentIndex, directories, forceCategories);
+        if (totalUsers > 20) {
+            console.log(`正在检查 ${totalUsers} 个用户的新内容...`);
+        }
 
-            if (seedResult) {
+        // 并发处理所有用户的内容检查，每批处理30个用户
+        const BATCH_SIZE = 30;
+        let processed = 0;
+
+        for (let i = 0; i < directoriesList.length; i += BATCH_SIZE) {
+            const batch = directoriesList.slice(i, i + BATCH_SIZE);
+
+            // 并发处理当前批次
+            const results = await Promise.all(batch.map(async (directories) => {
+                try {
+                    return await seedContentForUser(contentIndex, directories, forceCategories);
+                } catch (err) {
+                    console.error('Error seeding content for user:', err);
+                    return false;
+                }
+            }));
+
+            // 检查是否有任何内容被添加
+            if (results.some(r => r)) {
                 anyContentAdded = true;
             }
+
+            processed += batch.length;
+            if (totalUsers > 20) {
+                console.log(`  内容检查进度: ${Math.min(processed, totalUsers)}/${totalUsers}`);
+            }
+        }
+
+        if (totalUsers > 20) {
+            console.log(`✓ 所有用户内容检查完成`);
         }
 
         if (anyContentAdded && !contentCheckSkip && forceCategories?.length === 0) {
