@@ -292,24 +292,36 @@ function configureDiscreetLogin() {
     $('#passwordRecoveryBlock').hide();
     $('#passwordEntryBlock').show();
     $('#loginButton').off('click').on('click', async () => {
-        const handle = String($('#userHandle').val() || '').trim();
-        const password = String($('#userPassword').val() || '');
+        const rawHandle = String($('#userHandle').val() || '').trim();
 
-        if (!handle) {
+        if (!rawHandle) {
             displayError('请输入用户名');
             return;
         }
 
+        // 规范化用户名：支持英文大小写、数字和横杠
+        const handle = normalizeHandleFrontend(rawHandle);
+
+        if (!handle) {
+            displayError('用户名格式无效，仅支持英文、数字和横杠');
+            return;
+        }
+
+        const password = String($('#userPassword').val() || '');
         await performLogin(handle, password);
     });
 
     $('#recoverPassword').off('click').on('click', async () => {
-        const handle = String($('#userHandle').val());
+        const rawHandle = String($('#userHandle').val());
+        // 规范化用户名
+        const handle = normalizeHandleFrontend(rawHandle);
         await sendRecoveryPart1(handle);
     });
 
     $('#sendRecovery').off('click').on('click', async () => {
-        const handle = String($('#userHandle').val());
+        const rawHandle = String($('#userHandle').val());
+        // 规范化用户名
+        const handle = normalizeHandleFrontend(rawHandle);
         const code = String($('#recoveryCode').val());
         const newPassword = String($('#newPassword').val());
         await sendRecoveryPart2(handle, code, newPassword);
@@ -565,6 +577,24 @@ function showLoginAnnouncements(announcements) {
     });
 
     announcementArea.show();
+}
+
+/**
+ * 前端用户名规范化函数（与后端保持一致）
+ * @param {string} handle 原始用户名
+ * @returns {string} 规范化后的用户名
+ */
+function normalizeHandleFrontend(handle) {
+    if (!handle || typeof handle !== 'string') {
+        return '';
+    }
+
+    return handle
+        .toLowerCase()                    // 转换为小写
+        .trim()                           // 去除首尾空格
+        .replace(/[^a-z0-9-]/g, '-')      // 将非字母数字字符替换为横杠
+        .replace(/-+/g, '-')              // 连续横杠合并为一个
+        .replace(/^-+|-+$/g, '');         // 去除首尾横杠
 }
 
 /**

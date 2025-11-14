@@ -16,6 +16,7 @@ import {
     getPasswordHash,
     getUserDirectories,
     ensurePublicDirectoriesExist,
+    normalizeHandle,
 } from '../users.js';
 import { DEFAULT_USER } from '../constants.js';
 import systemMonitor from '../system-monitor.js';
@@ -116,13 +117,21 @@ router.post('/disable', requireAdminMiddleware, async (request, response) => {
             return response.status(400).json({ error: 'Missing required fields' });
         }
 
-        if (request.body.handle === request.user.profile.handle) {
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Disable user failed: Invalid handle format');
+            return response.status(400).json({ error: 'Invalid handle format' });
+        }
+
+        if (normalizedHandle === request.user.profile.handle) {
             console.warn('Disable user failed: Cannot disable yourself');
             return response.status(400).json({ error: 'Cannot disable yourself' });
         }
 
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.error('Disable user failed: User not found');
@@ -130,7 +139,7 @@ router.post('/disable', requireAdminMiddleware, async (request, response) => {
         }
 
         user.enabled = false;
-        await storage.setItem(toKey(request.body.handle), user);
+        await storage.setItem(toKey(normalizedHandle), user);
         return response.sendStatus(204);
     } catch (error) {
         console.error('User disable failed:', error);
@@ -145,8 +154,16 @@ router.post('/enable', requireAdminMiddleware, async (request, response) => {
             return response.status(400).json({ error: 'Missing required fields' });
         }
 
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Enable user failed: Invalid handle format');
+            return response.status(400).json({ error: 'Invalid handle format' });
+        }
+
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.error('Enable user failed: User not found');
@@ -154,7 +171,7 @@ router.post('/enable', requireAdminMiddleware, async (request, response) => {
         }
 
         user.enabled = true;
-        await storage.setItem(toKey(request.body.handle), user);
+        await storage.setItem(toKey(normalizedHandle), user);
         return response.sendStatus(204);
     } catch (error) {
         console.error('User enable failed:', error);
@@ -169,8 +186,16 @@ router.post('/promote', requireAdminMiddleware, async (request, response) => {
             return response.status(400).json({ error: 'Missing required fields' });
         }
 
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Promote user failed: Invalid handle format');
+            return response.status(400).json({ error: 'Invalid handle format' });
+        }
+
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.error('Promote user failed: User not found');
@@ -178,7 +203,7 @@ router.post('/promote', requireAdminMiddleware, async (request, response) => {
         }
 
         user.admin = true;
-        await storage.setItem(toKey(request.body.handle), user);
+        await storage.setItem(toKey(normalizedHandle), user);
         return response.sendStatus(204);
     } catch (error) {
         console.error('User promote failed:', error);
@@ -193,13 +218,21 @@ router.post('/demote', requireAdminMiddleware, async (request, response) => {
             return response.status(400).json({ error: 'Missing required fields' });
         }
 
-        if (request.body.handle === request.user.profile.handle) {
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Demote user failed: Invalid handle format');
+            return response.status(400).json({ error: 'Invalid handle format' });
+        }
+
+        if (normalizedHandle === request.user.profile.handle) {
             console.warn('Demote user failed: Cannot demote yourself');
             return response.status(400).json({ error: 'Cannot demote yourself' });
         }
 
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.error('Demote user failed: User not found');
@@ -207,7 +240,7 @@ router.post('/demote', requireAdminMiddleware, async (request, response) => {
         }
 
         user.admin = false;
-        await storage.setItem(toKey(request.body.handle), user);
+        await storage.setItem(toKey(normalizedHandle), user);
         return response.sendStatus(204);
     } catch (error) {
         console.error('User demote failed:', error);
@@ -223,7 +256,8 @@ router.post('/create', requireAdminMiddleware, async (request, response) => {
         }
 
         const handles = await getAllUserHandles();
-        const handle = lodash.kebabCase(String(request.body.handle).toLowerCase().trim());
+        // 使用统一的规范化函数
+        const handle = normalizeHandle(request.body.handle);
 
         if (!handle) {
             console.warn('Create user failed: Invalid handle');
@@ -280,14 +314,23 @@ router.post('/delete', requireAdminMiddleware, async (request, response) => {
             return response.status(400).json({ error: 'Sorry, but the default user cannot be deleted. It is required as a fallback.' });
         }
 
-        await storage.removeItem(toKey(request.body.handle));
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Delete user failed: Invalid handle format');
+            return response.status(400).json({ error: 'Invalid handle format' });
+        }
+
+        await storage.removeItem(toKey(normalizedHandle));
 
         if (request.body.purge) {
-            const directories = getUserDirectories(request.body.handle);
-            console.info('Deleting data directories for', request.body.handle);
+            const directories = getUserDirectories(normalizedHandle);
+            console.info('Deleting data directories for', normalizedHandle);
             await fsPromises.rm(directories.root, { recursive: true, force: true });
         }
 
+        console.info('Deleted user:', normalizedHandle, 'purge:', !!request.body.purge);
         return response.sendStatus(204);
     } catch (error) {
         console.error('User delete failed:', error);
@@ -302,7 +345,8 @@ router.post('/slugify', requireAdminMiddleware, async (request, response) => {
             return response.status(400).json({ error: 'Missing required fields' });
         }
 
-        const text = lodash.kebabCase(String(request.body.text).toLowerCase().trim());
+        // 使用统一的规范化函数
+        const text = normalizeHandle(request.body.text);
 
         return response.send(text);
     } catch (error) {

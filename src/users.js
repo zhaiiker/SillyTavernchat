@@ -477,6 +477,38 @@ export async function migrateSystemPrompts() {
 }
 
 /**
+ * 规范化用户名
+ * 规则：
+ * - 转换为小写
+ * - 只保留字母、数字和横杠
+ * - 连续的横杠合并为一个
+ * - 去除首尾横杠
+ * - 验证结果不为空
+ *
+ * @param {string} handle - 原始用户名
+ * @returns {string} - 规范化后的用户名
+ *
+ * @example
+ * normalizeHandle("User-Name")     => "user-name"
+ * normalizeHandle("user--name")    => "user-name"
+ * normalizeHandle("User_123")      => "user-123"
+ * normalizeHandle("-user-")        => "user"
+ * normalizeHandle("User@Name#123") => "username123"
+ */
+export function normalizeHandle(handle) {
+    if (!handle || typeof handle !== 'string') {
+        return '';
+    }
+
+    return handle
+        .toLowerCase()                    // 转换为小写
+        .trim()                           // 去除首尾空格
+        .replace(/[^a-z0-9-]/g, '-')      // 将非字母数字字符替换为横杠
+        .replace(/-+/g, '-')              // 连续横杠合并为一个
+        .replace(/^-+|-+$/g, '');         // 去除首尾横杠
+}
+
+/**
  * Converts a user handle to a storage key.
  * @param {string} handle User handle
  * @returns {string} The key for the user storage

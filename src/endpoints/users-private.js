@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import storage from 'node-persist';
 import express from 'express';
 
-import { getUserAvatar, toKey, getPasswordHash, getPasswordSalt, createBackupArchive, ensurePublicDirectoriesExist, toAvatarKey } from '../users.js';
+import { getUserAvatar, toKey, getPasswordHash, getPasswordSalt, createBackupArchive, ensurePublicDirectoriesExist, toAvatarKey, normalizeHandle } from '../users.js';
 import { SETTINGS_FILE } from '../constants.js';
 import { checkForNewContent, CONTENT_TYPES } from './content-manager.js';
 import { color, Cache } from '../util.js';
@@ -70,15 +70,23 @@ router.post('/change-avatar', async (request, response) => {
             return response.status(400).json({ error: 'Invalid data URL' });
         }
 
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Change avatar failed: Invalid handle format');
+            return response.status(400).json({ error: 'Invalid handle format' });
+        }
+
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.error('Change avatar failed: User not found');
             return response.status(404).json({ error: 'User not found' });
         }
 
-        await storage.setItem(toAvatarKey(request.body.handle), request.body.avatar);
+        await storage.setItem(toAvatarKey(normalizedHandle), request.body.avatar);
 
         return response.sendStatus(204);
     } catch (error) {
@@ -94,13 +102,21 @@ router.post('/change-password', async (request, response) => {
             return response.status(400).json({ error: 'Missing required fields' });
         }
 
-        if (request.body.handle !== request.user.profile.handle && !request.user.profile.admin) {
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Change password failed: Invalid handle format');
+            return response.status(400).json({ error: 'Invalid handle format' });
+        }
+
+        if (normalizedHandle !== request.user.profile.handle && !request.user.profile.admin) {
             console.error('Change password failed: Unauthorized');
             return response.status(403).json({ error: 'Unauthorized' });
         }
 
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.error('Change password failed: User not found');
@@ -126,7 +142,7 @@ router.post('/change-password', async (request, response) => {
             user.salt = '';
         }
 
-        await storage.setItem(toKey(request.body.handle), user);
+        await storage.setItem(toKey(normalizedHandle), user);
         return response.sendStatus(204);
     } catch (error) {
         console.error(error);
@@ -182,13 +198,21 @@ router.post('/change-name', async (request, response) => {
             return response.status(400).json({ error: 'Missing required fields' });
         }
 
-        if (request.body.handle !== request.user.profile.handle && !request.user.profile.admin) {
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Change name failed: Invalid handle format');
+            return response.status(400).json({ error: 'Invalid handle format' });
+        }
+
+        if (normalizedHandle !== request.user.profile.handle && !request.user.profile.admin) {
             console.error('Change name failed: Unauthorized');
             return response.status(403).json({ error: 'Unauthorized' });
         }
 
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.warn('Change name failed: User not found');
@@ -196,7 +220,7 @@ router.post('/change-name', async (request, response) => {
         }
 
         user.name = request.body.name;
-        await storage.setItem(toKey(request.body.handle), user);
+        await storage.setItem(toKey(normalizedHandle), user);
 
         return response.sendStatus(204);
     } catch (error) {

@@ -5,7 +5,7 @@ import express from 'express';
 import { RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 import { getIpFromRequest, getRealIpFromHeader } from '../express-common.js';
 import { color, Cache, getConfigValue } from '../util.js';
-import { KEY_PREFIX, getUserAvatar, toKey, getPasswordHash, getPasswordSalt, getAllUserHandles, getUserDirectories, ensurePublicDirectoriesExist } from '../users.js';
+import { KEY_PREFIX, getUserAvatar, toKey, getPasswordHash, getPasswordSalt, getAllUserHandles, getUserDirectories, ensurePublicDirectoriesExist, normalizeHandle } from '../users.js';
 import { validateInvitationCode, useInvitationCode, getPurchaseLink, isInvitationCodesEnabled } from '../invitation-codes.js';
 import { checkForNewContent, CONTENT_TYPES } from './content-manager.js';
 import systemMonitor from '../system-monitor.js';
@@ -39,17 +39,24 @@ const sendVerificationLimiter = new RateLimiterMemory({
 /**
  * 判断用户名是否过于随意/简单，不允许注册。
  * 规则：
+ * - 长度小于3
  * - 纯数字且长度>=3
  * - 单字符重复3次及以上（如 aaa, 1111）
  * - 常见随意/弱用户名列表
  */
 function isTrivialHandle(handle) {
     if (!handle) return true;
-    const h = String(handle).toLowerCase();
+    const h = String(handle).toLowerCase().replace(/-/g, ''); // 移除横杠后判断
+
+    // 长度太短
+    if (h.length < 3) return true;
+
     // 纯数字，长度>=3
     if (/^\d{3,}$/.test(h)) return true;
+
     // 单字符重复3次及以上
     if (/^(.)\1{2,}$/.test(h)) return true;
+
     // 常见随意用户名/弱用户名集合
     const banned = new Set([
         '123', '1234', '12345', '123456', '000', '0000', '111', '1111',
@@ -104,8 +111,16 @@ router.post('/login', async (request, response) => {
         const ip = getIpAddress(request);
         await loginLimiter.consume(ip);
 
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Login failed: Invalid handle format');
+            return response.status(400).json({ error: '用户名格式无效' });
+        }
+
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.error('Login failed: User', request.body.handle, 'not found');
@@ -265,8 +280,16 @@ router.post('/recover-step1', async (request, response) => {
         const ip = getIpAddress(request);
         await recoverLimiter.consume(ip);
 
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Recover step 1 failed: Invalid handle format');
+            return response.status(400).json({ error: '用户名格式无效' });
+        }
+
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {
             console.error('Recover step 1 failed: User', request.body.handle, 'not found');
@@ -332,8 +355,16 @@ router.post('/recover-step2', async (request, response) => {
             return response.status(400).json({ error: '缺少必填字段' });
         }
 
+        // 规范化用户名
+        const normalizedHandle = normalizeHandle(request.body.handle);
+
+        if (!normalizedHandle) {
+            console.warn('Recover step 2 failed: Invalid handle format');
+            return response.status(400).json({ error: '用户名格式无效' });
+        }
+
         /** @type {import('../users.js').User} */
-        const user = await storage.getItem(toKey(request.body.handle));
+        const user = await storage.getItem(toKey(normalizedHandle));
         const ip = getIpAddress(request);
 
         if (!user) {
@@ -358,11 +389,11 @@ router.post('/recover-step2', async (request, response) => {
             const salt = getPasswordSalt();
             user.password = getPasswordHash(request.body.newPassword, salt);
             user.salt = salt;
-            await storage.setItem(toKey(user.handle), user);
+            await storage.setItem(toKey(normalizedHandle), user);
         } else {
             user.password = '';
             user.salt = '';
-            await storage.setItem(toKey(user.handle), user);
+            await storage.setItem(toKey(normalizedHandle), user);
         }
 
         await recoverLimiter.delete(ip);
@@ -443,24 +474,24 @@ router.post('/register', async (request, response) => {
         }
 
         const handles = await getAllUserHandles();
-        // 规范化用户名：转小写，去除所有非字母数字字符
-        const normalizedHandle = String(handle).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+        // 规范化用户名：支持英文大小写、数字和横杠
+        const normalizedHandle = normalizeHandle(handle);
 
         if (!normalizedHandle) {
             console.warn('Register failed: Invalid handle');
-            return response.status(400).json({ error: '用户名无效' });
+            return response.status(400).json({ error: '用户名无效，仅支持英文、数字和横杠' });
         }
 
-        // 验证用户名只包含字母和数字，不允许任何符号
-        if (!/^[a-z0-9]+$/.test(normalizedHandle)) {
+        // 验证用户名格式：只包含字母、数字和横杠
+        if (!/^[a-z0-9-]+$/.test(normalizedHandle)) {
             console.warn('Register failed: Handle contains invalid characters:', normalizedHandle);
-            return response.status(400).json({ error: '用户名只能包含字母和数字，不允许使用符号' });
+            return response.status(400).json({ error: '用户名只能包含字母、数字和横杠' });
         }
 
         // 限制随意/弱用户名
         if (isTrivialHandle(normalizedHandle)) {
             console.warn('Register failed: Trivial/weak handle not allowed:', normalizedHandle);
-            return response.status(400).json({ error: '用户名过于简单，请使用更有辨识度的用户名' });
+            return response.status(400).json({ error: '用户名过于简单或在黑名单中，请使用更有辨识度的用户名' });
         }
 
         if (handles.some(x => x === normalizedHandle)) {
@@ -522,7 +553,14 @@ router.post('/register', async (request, response) => {
 
         await registerLimiter.delete(ip);
         console.info('User registered successfully:', newUser.handle, 'from', ip);
-        return response.json({ handle: newUser.handle });
+
+        // 返回规范化后的用户名，让用户知道真实的用户名
+        return response.json({
+            handle: newUser.handle,
+            message: handle !== normalizedHandle
+                ? `注册成功！您的用户名已规范化为: ${normalizedHandle}`
+                : '注册成功！'
+        });
     } catch (error) {
         if (error instanceof RateLimiterRes) {
             console.error('Register failed: Rate limited from', getIpAddress(request));
@@ -642,8 +680,13 @@ router.post('/renew-expired', async (request, response) => {
             return response.status(400).json({ error: '请输入续费码' });
         }
 
-        // 验证用户身份
-        const normalizedHandle = handle.toLowerCase();
+        // 验证用户身份 - 规范化用户名
+        const normalizedHandle = normalizeHandle(handle);
+
+        if (!normalizedHandle) {
+            return response.status(400).json({ error: '用户名格式无效' });
+        }
+
         const user = await storage.getItem(toKey(normalizedHandle));
 
         if (!user) {

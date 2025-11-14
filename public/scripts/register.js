@@ -185,23 +185,23 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
 
-        // 规范化用户名：转小写，去除所有非字母数字字符
-        const normalizedHandle = formData.handle.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+        // 规范化用户名：支持英文大小写、数字和横杠
+        const normalizedHandle = normalizeHandleFrontend(formData.handle);
 
         if (!normalizedHandle) {
-            showError('用户名无效');
+            showError('用户名无效，仅支持英文、数字和横杠');
             return false;
         }
 
-        // 验证用户名格式：只允许字母和数字
-        if (!/^[a-z0-9]+$/.test(normalizedHandle)) {
-            showError('用户名只能包含字母和数字，不允许使用符号');
+        // 验证用户名格式：只允许字母、数字和横杠
+        if (!/^[a-z0-9-]+$/.test(normalizedHandle)) {
+            showError('用户名只能包含字母、数字和横杠');
             return false;
         }
 
         // 额外：限制过于随意/弱的用户名
         if (isTrivialHandle(normalizedHandle)) {
-            showError('用户名过于简单，请使用更有辨识度的用户名');
+            showError('用户名过于简单或在黑名单中，请使用更有辨识度的用户名');
             return false;
         }
 
@@ -236,10 +236,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
 
-        // 规范化用户名：转小写，去除所有非字母数字字符
-        const normalizedHandle = handle.toLowerCase().replace(/[^a-z0-9]/g, '');
+        // 规范化用户名：支持英文大小写、数字和横杠
+        const normalizedHandle = normalizeHandleFrontend(handle);
 
-        if (!normalizedHandle || !/^[a-z0-9]+$/.test(normalizedHandle) || isTrivialHandle(normalizedHandle)) {
+        if (!normalizedHandle || !/^[a-z0-9-]+$/.test(normalizedHandle) || isTrivialHandle(normalizedHandle)) {
             input.classList.remove('valid');
             input.classList.add('invalid');
         } else {
@@ -248,10 +248,30 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    /**
+     * 前端用户名规范化函数（与后端保持一致）
+     */
+    function normalizeHandleFrontend(handle) {
+        if (!handle || typeof handle !== 'string') {
+            return '';
+        }
+
+        return handle
+            .toLowerCase()                    // 转换为小写
+            .trim()                           // 去除首尾空格
+            .replace(/[^a-z0-9-]/g, '-')      // 将非字母数字字符替换为横杠
+            .replace(/-+/g, '-')              // 连续横杠合并为一个
+            .replace(/^-+|-+$/g, '');         // 去除首尾横杠
+    }
+
     // 与后端一致的随意/弱用户名判断
     function isTrivialHandle(handle) {
         if (!handle) return true;
-        const h = String(handle).toLowerCase();
+        const h = String(handle).toLowerCase().replace(/-/g, ''); // 移除横杠后判断
+
+        // 长度太短
+        if (h.length < 3) return true;
+
         if (/^\d{3,}$/.test(h)) return true; // 纯数字且>=3
         if (/^(.)\1{2,}$/.test(h)) return true; // 同字符重复>=3
         const banned = new Set([
@@ -341,11 +361,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         })
         .then(data => {
-            // 注册成功，跳转到登录页面
-            showSuccess('注册成功！正在跳转到登录页面...');
+            // 注册成功，显示消息并跳转到登录页面
+            const message = data.message || '注册成功！正在跳转到登录页面...';
+            showSuccess(message);
+
+            // 如果用户名被规范化，额外提示
+            if (data.message && data.message.includes('规范化')) {
+                console.info('用户名已规范化为:', data.handle);
+            }
+
             setTimeout(() => {
                 window.location.href = '/login';
-            }, 2000);
+            }, 3000); // 延长到3秒，让用户看清提示
         })
         .catch(error => {
             console.error('Registration error:', error);
